@@ -1,0 +1,433 @@
+type: edu
+custom_name: stage6
+files:
+- name: test/ConverterTest.java
+  visible: false
+  text: |
+    import converter.Main;
+    import org.hyperskill.hstest.stage.StageTest;
+    import org.hyperskill.hstest.testcase.CheckResult;
+    import org.hyperskill.hstest.testcase.TestCase;
+
+    import java.util.List;
+
+    class Clue {
+        final String input;
+        String answer;
+        final boolean provideAnswer;
+
+        Clue(final String input, final String answer, final boolean provideAnswer) {
+            this.input = input;
+            this.answer = answer;
+            this.provideAnswer = provideAnswer;
+        }
+
+        Clue(final String input, final String answer) {
+            this(input, answer, false);
+        }
+
+        Clue(final String input) {
+            this(input, null, false);
+        }
+    }
+
+
+    public class ConverterTest extends StageTest<Clue> {
+
+        public ConverterTest() {
+            super(Main.class);
+        }
+
+        static TestCase<Clue> testToAnswer(final String input, final String answer, final boolean provideAnswer) {
+            return new TestCase<Clue>()
+                .setAttach(new Clue(input, answer, provideAnswer))
+                .setInput(input);
+        }
+
+        @Override
+        public List<TestCase<Clue>> generate() {
+            return List.of(
+                /* Tests with a hint: */
+                testToAnswer("a b\n\n\n", null, true),
+                testToAnswer("11\nabc\n\n", null, true),
+                testToAnswer("11\n1\ndas\n", null, true),
+                testToAnswer("0\n1\ndas\n", null, true),
+                testToAnswer("37\n1\ndas\n", null, true),
+                testToAnswer("36\n1\n0\n", null, true),
+                testToAnswer("36\n1\n37\n", null, true),
+
+                /* Tests without a hint: */
+                testToAnswer("c\n\n\n", null, false),
+                testToAnswer("12\nbc\n\n", null, false),
+                testToAnswer("12\n1\nhf\n", null, false),
+                testToAnswer("0\n2\nhf\n", null, false),
+                testToAnswer("37\n2\nhf\n", null, false),
+                testToAnswer("14\n2\n-1\n", null, false),
+                testToAnswer("14\n2\n38\n", null, false),
+
+                /* Tests from previous stage (with a hint): */
+                testToAnswer("10\n0.234\n7", "0.14315", true),
+                testToAnswer("10\n10.234\n7", "13.14315", true),
+                testToAnswer("6\n2.555\n1", "11", true),
+                testToAnswer("35\naf.xy\n17", "148.g88a8", true),
+                testToAnswer("10\n11\n2", "1011", true),
+                testToAnswer("16\naaaaa.0\n24", "22df2.00000", true),
+                testToAnswer("16\n0.cdefb\n24", "0.j78da", true),
+                testToAnswer("16\naaaaa.cdefb\n24", "22df2.j78da", true),
+
+                /* Tests from previous stage (without a hint): */
+                testToAnswer("10\n0.2340\n7", "0.14315", false),
+                testToAnswer("10\n10.2340\n7", "13.14315", false),
+                testToAnswer("6\n2.5550\n1", "11", false),
+                testToAnswer("35\naf.xy0\n17", "148.g88a8", false),
+                testToAnswer("10\n12\n2", "1100", false),
+                testToAnswer("16\naaaaa.00\n24", "22df2.00000", false),
+                testToAnswer("16\n0.cdefb0\n24", "0.j78da", false),
+                testToAnswer("16\naaaaa.cdefb0\n24", "22df2.j78da", false),
+
+                /* Tests from previous stage (with a hint): */
+                testToAnswer("10\n11\n2\n", "1011", true),
+                testToAnswer("1\n11111\n10\n", "5", true),
+                testToAnswer("10\n1000\n36\n", "rs", true),
+                testToAnswer("21\n4242\n6\n", "451552", true),
+                testToAnswer("7\n12\n11\n", "9", true),
+                testToAnswer("5\n300\n10\n", "75", true),
+                testToAnswer("1\n11111\n5\n", "10", true),
+                testToAnswer("10\n4\n1\n", "1111", true),
+
+                /* Tests from previous stage (without a hint): */
+                testToAnswer("10\n12\n2\n", "1100", false),
+                testToAnswer("1\n1111111\n10\n", "7", false),
+                testToAnswer("10\n1001\n36\n", "rt", false),
+                testToAnswer("21\n4243\n6\n", "451553", false),
+                testToAnswer("7\n13\n11\n", "a", false),
+                testToAnswer("5\n301\n10\n", "76", false),
+                testToAnswer("1\n111111\n5\n", "11", false),
+                testToAnswer("10\n5\n1\n", "11111", false)
+            );
+        }
+
+        @Override
+        public CheckResult check(String reply, Clue clue) {
+            final String[] lines = reply
+                .lines()
+                .filter(line -> !line.isEmpty())
+                .toArray(String[]::new);
+
+            if (lines.length == 0) {
+                return new CheckResult(
+                    false,
+                    "Your program doesn't print any line."
+                );
+            }
+
+            String answer = lines[lines.length - 1];
+
+            if (clue.answer == null) {
+                if (answer.toLowerCase().contains("error")) {
+                    return new CheckResult(true);
+                } else if (clue.provideAnswer) {
+                    return new CheckResult(
+                        false,
+                        "Your program doesn't say about an error.\n" +
+                            "This is a sample test so we give you a hint.\n" +
+                            "Input: " + clue.input + "\n" +
+                            "Your answer: " + answer
+                    );
+                } else {
+                    return new CheckResult(
+                        false,
+                        "Your program doesn't say about an error."
+                    );
+                }
+            }
+
+            answer = answer.replaceAll("[^\\p{Graph}]", "");
+            clue.answer = clue.answer.replaceAll("[^\\p{Graph}]", "");
+
+            answer = removeEndZeros(answer);
+            clue.answer = removeEndZeros(clue.answer);
+
+            if (!answer.equals(clue.answer)) {
+                if (clue.provideAnswer) {
+                    return new CheckResult(
+                        false,
+                        "Your program gives a wrong answer when there is no error in the input.\n" +
+                            "This is a sample test so we give you a hint.\n" +
+                            "Input: " + clue.input + "\n" +
+                            "Your answer: " + answer + "\n" +
+                            "Correct answer: " + clue.answer
+                    );
+                } else {
+                    return new CheckResult(
+                        false,
+                        "Your program gives a wrong answer when there is no error in the input."
+                    );
+                }
+            }
+
+            return new CheckResult(true);
+        }
+
+        private String removeEndZeros(String number) {
+            if (!number.contains(".")) {
+                return number;
+            }
+            while (number.endsWith("0")) {
+                number = number.substring(0, number.length() - 1);
+            }
+            if (number.endsWith(".")) {
+                number = number.substring(0, number.length() - 1);
+            }
+            return number;
+        }
+    }
+  learner_created: false
+- name: src/converter/Main.java
+  visible: true
+  text: |
+    package converter;
+
+    import java.io.BufferedReader;
+    import java.io.IOException;
+    import java.io.InputStreamReader;
+
+    public class Main {
+        public static void main(String[] args) {
+
+            String number = "";
+            int radix = 0;
+            int newRadix = 0;
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
+                radix = Integer.parseInt(reader.readLine());
+                number = reader.readLine();
+                newRadix = Integer.parseInt(reader.readLine());
+            } catch (IOException e) {
+                System.out.println("Exception input");
+            }
+            double decimalNumber = 0;
+
+            if (!number.contains(".")) {
+                if (radix != 10 && radix != 1) {
+                    decimalNumber = Integer.parseInt(number, radix);
+                } else if (radix == 1) {
+                    decimalNumber = convertFromOneToDecimal(number);
+                } else {
+                    decimalNumber = Integer.parseInt(number);
+                }
+            } else {
+                decimalNumber = convertFractionalNumberToDecimal(number, radix);
+            }
+
+            String result = "";
+
+
+            if (newRadix != 1 && number.contains(".")) {
+                result = convertFractionalDecimalNumberToAnotherBase(decimalNumber, newRadix);
+            } else if (newRadix !=1 && !number.contains(".")) {
+                result = Integer.toString((int) decimalNumber, newRadix);
+            } else {
+                result = convertFromDecimalToOne((int) decimalNumber);
+            }
+
+            System.out.println(result);
+
+        }
+
+        public static String convertFractionalDecimalNumberToAnotherBase(double number, int newRadix) {
+            StringBuilder result = new StringBuilder();
+            String intPart = Integer.toString((int) number, newRadix);
+            result.append(intPart);
+            result.append(".");
+            double fractPart = number - (int) number;
+            for (int i = 0; i < 5; i++) {
+                double res = fractPart * newRadix;
+                fractPart = res - (int) res;
+                if ((int) res <= 9) {
+                    result.append((int) res);
+                } else {
+                    result.append((char) ((int) res + 87));
+                }
+            }
+            return result.toString();
+        }
+
+        public static double convertFractionalNumberToDecimal(String number, int radix) {
+            double result = 0;
+            String[] parts = number.split("[.]");
+            if (parts[0].contains("[a-z]")){
+                String[] letters = parts[0].split("");
+                for (int i = 0; i < letters.length; i++) {
+                    if (letters[i].matches("[a-z]")) {
+                        letters[i] = Integer.toString(Integer.parseInt(letters[i]) - 87);
+                    }
+                }
+            }
+            if (!parts[0].equals("10")) {
+                result += Integer.parseInt(parts[0], radix);
+            } else {
+                result += 10;
+            }
+            String[] fractPart = parts[1].split("");
+            int base = radix;
+            double res = 0;
+            for (String s : fractPart) {
+                if (s.matches("[a-z]")) {
+                    s = String.valueOf(s.charAt(0) - 87);
+                }
+                res += (double) Integer.parseInt(s) / base;
+                base *= radix;
+            }
+            result += res;
+            return result;
+        }
+
+        public static String convertFromDecimalToOne(int number) {
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i < number; i++) {
+                result.append(1);
+            }
+            return result.toString();
+        }
+
+        public static int convertFromOneToDecimal(String number) {
+            return number.length();
+        }
+
+        public static String fromDecimalToHex(String number) {
+            int num = Integer.parseInt(number);
+            int temp = Integer.parseInt(number);
+            StringBuilder res = new StringBuilder();
+            res.append("0x");
+            if (num == 0) res.append(0);
+            int count = 0;
+            while (temp != 0) {
+                temp /= 16;
+                count++;
+            }
+            String[] digits = new String[count];
+            int i = 0;
+            while (num != 0) {
+                int remainder = num % 16;
+                if (remainder <= 9) {
+                    digits[i] = String.valueOf(remainder);
+                } else {
+                    switch (remainder) {
+                        case 10:
+                            digits[i] = "a";
+                            break;
+                        case 11:
+                            digits[i] = "b";
+                            break;
+                        case 12:
+                            res.append("c");
+                            break;
+                        case 13:
+                            digits[i] = "d";
+                            break;
+                        case 14:
+                            digits[i] = "e";
+                            break;
+                        case 15:
+                            digits[i] = "f";
+                            break;
+                    }
+                }
+                num /= 16;
+                i++;
+            }
+            for (int j = digits.length - 1; j >= 0; j--) {
+                res.append(digits[j]);
+            }
+            return res.toString();
+        }
+
+        public static String fromDecimalToOctop(String number) {
+            StringBuilder res = new StringBuilder();
+            res.append(0);
+            int temp = Integer.parseInt(number);
+            int num = Integer.parseInt(number);
+            if (num == 0) res.append(0);
+            int count = 0;
+            while (temp != 0) {
+                temp /= 8;
+                count++;
+            }
+            int[] digits = new int[count];
+            int i = 0;
+            while (num != 0) {
+                int remainder = num % 8;
+                digits[i] = remainder;
+                i++;
+                num /= 8;
+            }
+            for (int j = digits.length - 1; j >= 0; j--) {
+                res.append(digits[j]);
+            }
+            return res.toString();
+        }
+
+        public static String fromDecimalToBinary(String number) {
+            StringBuilder result = new StringBuilder();
+            result.append("0b");
+            int temp = Integer.parseInt(number);
+            int num = Integer.parseInt(number);
+            if (num == 0) result.append(0);
+            int count = 0;
+            while (temp != 0) {
+                temp /= 2;
+                count++;
+            }
+            int[] digitals = new int[count];
+            int i = 0;
+            while (num != 0) {
+                int remainder = num % 2;
+                if (remainder == 0) {
+                    digitals[i] = 0;
+                } else {
+                    digitals[i] = 1;
+                }
+                num /= 2;
+                i++;
+            }
+            for (int j = digitals.length - 1; j >= 0; j--) {
+                result.append(digitals[j]);
+            }
+            return result.toString();
+        }
+
+        public static String fromBinaryToHex(String number) {
+            StringBuilder res = new StringBuilder();
+            res.append("0x");
+            StringBuilder addZero = new StringBuilder();
+            int check = number.length();
+            if (check % 4 != 0) {
+                while (check % 4 != 0) {
+                    addZero.append(0);
+                    check++;
+                }
+            }
+            addZero.append(number);
+            String[] digits = addZero.toString().split("");
+            int temp = 0;
+            for (int i = 0; i < digits.length; i = i + 4) {
+                if (Integer.parseInt(digits[i]) == 1) temp += 8;
+                if (Integer.parseInt(digits[i + 1]) == 1) temp += 4;
+                if (Integer.parseInt(digits[i + 2]) == 1) temp += 2;
+                if (Integer.parseInt(digits[i + 3]) == 1) temp += 1;
+                if (temp <= 9) res.append(temp);
+                else if (temp == 10) res.append("A");
+                else if (temp == 11) res.append("B");
+                else if (temp == 12) res.append("C");
+                else if (temp == 13) res.append("D");
+                else if (temp == 14) res.append("E");
+                else if (temp == 15) res.append("F");
+            }
+            return res.toString();
+        }
+    }
+  learner_created: true
+feedback_link: https://hyperskill.org/projects/41/stages/219/implement
+status: Solved
+record: -1
